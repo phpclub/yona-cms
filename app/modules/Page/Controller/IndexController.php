@@ -17,9 +17,9 @@ class IndexController extends Controller
             throw new Exception("Page '$slug.html' not found");
         }
 
-        $this->helper->title()->append($page->getMeta_title());
-        $this->helper->meta()->set('description', $page->getMeta_description());
-        $this->helper->meta()->set('keywords', $page->getMeta_keywords());
+        $this->helper->title()->append($page->getMetaTitle());
+        $this->helper->meta()->set('description', $page->getMetaDescription());
+        $this->helper->meta()->set('keywords', $page->getMetaKeywords());
 
         $this->view->page = $page;
     }
@@ -31,12 +31,12 @@ class IndexController extends Controller
             throw new Exception("Page 'contacts' not found");
         }
 
-        $this->helper->title()->append($page->getMeta_title());
-        $this->helper->meta()->set('description', $page->getMeta_description());
-        $this->helper->meta()->set('keywords', $page->getMeta_keywords());
+        $this->helper->title()->append($page->getMetaTitle());
+        $this->helper->meta()->set('description', $page->getMetaDescription());
+        $this->helper->meta()->set('keywords', $page->getMetaKeywords());
         $this->view->page = $page;
 
         $this->helper->menu->setActive('contacts');
     }
 
-} 
+}
