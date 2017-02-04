@@ -3,6 +3,7 @@
 namespace Publication\Controller;
 
 use Application\Mvc\Controller;
+use Publication\Model\Helper\PublicationHelper;
 use Publication\Model\Publication;
 use Phalcon\Exception;
 use Publication\Model\Type;
@@ -12,31 +13,45 @@ class IndexController extends Controller
 
     public function indexAction()
     {
-        $type = $this->dispatcher->getParam('type', 'string');
+        $type      = $this->dispatcher->getParam('type', 'string');
         $typeModel = Type::getCachedBySlug($type);
         if (!$typeModel) {
             throw new Exception("Publication hasn't type = '$type''");
         }
 
         $typeLimit = ($typeModel->getLimit()) ? $typeModel->getLimit() : 10;
-        $limit = $this->request->getQuery('limit', 'string', $typeLimit);
+        $limit     = $this->request->getQuery('limit', 'string', $typeLimit);
         if ($limit != 'all') {
-            $paginatorLimit = (int) $limit;
+            $paginatorLimit = (int)$limit;
         } else {
             $paginatorLimit = 9999;
         }
         $page = $this->request->getQuery('page', 'int', 1);
 
-        $publications = Publication::find(array(
+        /*$publications = Publication::find(array(
             "type_id = {$typeModel->getId()}",
             "order" => "date DESC",
-        ));
+        ));*/
 
-        $paginator = new \Phalcon\Paginator\Adapter\Model(array(
-            "data" => $publications,
+        $publicationHelper = new PublicationHelper();
+        $fields = $publicationHelper->translateFieldsSubQuery();
+
+        $columns = ['p.*', 't_slug' => 't.slug'];
+        $columns = array_merge($columns, $fields);
+
+        $qb = $this->modelsManager->createBuilder()
+            ->columns($columns)
+            ->addFrom('Publication\Model\Publication', 'p')
+            ->leftJoin('Publication\Model\Type', null, 't')
+            ->andWhere('t.slug = :type:', ['type' => $type])
+            ->andWhere('p.date <= NOW()')
+            ->orderBy('p.date DESC');
+
+        $paginator = new \Phalcon\Paginator\Adapter\QueryBuilder([
+            "builder"  => $qb,
             "limit" => $paginatorLimit,
-            "page" => $page
-        ));
+            "page"  => $page
+        ]);
 
         $this->view->paginate = $paginator->getPaginate();
 
@@ -44,9 +59,9 @@ class IndexController extends Controller
         if ($page > 1) {
             $this->helper->title()->append($this->helper->translate('Страница №') . ' ' . $page);
         }
-        $this->view->title = $typeModel->getTitle();
+        $this->view->title  = $typeModel->getTitle();
         $this->view->format = $typeModel->getFormat();
-        $this->view->type = $type;
+        $this->view->type   = $type;
 
         $this->helper->menu->setActive($type);
     }
@@ -56,21 +71,22 @@ class IndexController extends Controller
         $slug = $this->dispatcher->getParam('slug', 'string');
         $type = $this->dispatcher->getParam('type', 'string');
 
-        $publication = Publication::findCachedBySlug($slug);
-        if (!$publication) {
+        $publicationHelper = new PublicationHelper();
+        $publicationResult = $publicationHelper->publicationBySlug($slug);
+        if (!$publicationResult) {
             throw new Exception("Publication '$slug.html' not found");
         }
-        if ($publication->getTypeSlug() != $type) {
+        if ($publicationResult->p->getTypeSlug() != $type) {
             throw new Exception("Publication type <> $type");
         }
 
-        $this->helper->title()->append($publication->getMetaTitle());
-        $this->helper->meta()->set('description', $publication->getMetaDescription());
-        $this->helper->meta()->set('keywords', $publication->getMetaKeywords());
+        $this->helper->title()->append($publicationResult->meta_title);
+        $this->helper->meta()->set('description', $publicationResult->meta_description);
+        $this->helper->meta()->set('keywords', $publicationResult->meta_keywords);
 
-        $this->view->publication = $publication;
         $this->helper->menu->setActive($type);
 
+        $this->view->publicationResult = $publicationResult;
     }
 
 }

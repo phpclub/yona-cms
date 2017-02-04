@@ -2,9 +2,10 @@
 
 namespace Publication\Model;
 
+use Application\Cache\Keys;
 use Application\Mvc\Model\Model;
-use Phalcon\Mvc\Model\Validator\Uniqueness;
-use Phalcon\Mvc\Model\Validator\PresenceOf;
+use Phalcon\Validation;
+use Phalcon\Validation\Validator\Uniqueness as UniquenessValidator;
 use Application\Localization\Transliterator;
 
 class Publication extends Model
@@ -14,8 +15,6 @@ class Publication extends Model
     {
         return "publication";
     }
-
-    protected $translateModel = 'Publication\Model\Translate\PublicationTranslate'; // translate
 
     public function initialize()
     {
@@ -34,12 +33,21 @@ class Publication extends Model
     private $date;
     private $preview_src;
     private $preview_inner;
-
+    
     protected $title;
     protected $text;
     protected $meta_title;
     protected $meta_description;
     protected $meta_keywords;
+
+    protected $translateModel = 'Publication\Model\Translate\PublicationTranslate'; // translate
+    protected $translateFields = [
+        'title',
+        'meta_title',
+        'meta_description',
+        'meta_keywords',
+        'text'
+    ];
 
     public function beforeCreate()
     {
@@ -58,18 +66,24 @@ class Publication extends Model
         $cache = $this->getDi()->get('cache');
 
         $cache->delete(self::cacheSlugKey($this->getSlug()));
+
+        $this->cacheManager->delete([
+            Keys::PUBLICATION,
+            $this->slug,
+            self::$lang
+        ]);
     }
 
     public function validation()
     {
-        $this->validate(new Uniqueness(
+        $validator = new Validation();
+        $validator->add('slug', new UniquenessValidator(
             [
-                "field"   => "slug",
-                "message" => "Страница с такой транслитерацией = '" . $this->slug . "' уже существует"
+                "model"   => $this,
+                "message" => $this->getDi()->get('helper')->translate("Publishcation with slug is already exists")
             ]
         ));
-
-        return $this->validationHasFailed() != true;
+        return $this->validate($validator);
     }
 
     public function afterValidation()
@@ -247,6 +261,16 @@ class Publication extends Model
     {
         if ($this->type_id) {
             $types = Type::cachedListArray(['key' => 'id', 'value' => 'slug']);
+            if (array_key_exists($this->type_id, $types)) {
+                return $types[$this->type_id];
+            }
+        }
+    }
+
+    public function getTypeDisplayDate()
+    {
+        if ($this->type_id) {
+            $types = Type::cachedListArray(['key' => 'id', 'value' => 'display_date']);
             if (array_key_exists($this->type_id, $types)) {
                 return $types[$this->type_id];
             }

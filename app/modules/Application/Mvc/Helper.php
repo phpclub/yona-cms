@@ -13,6 +13,9 @@ use Cms\Model\Language;
 
 class Helper extends \Phalcon\Mvc\User\Component
 {
+    const StaticWidgetDefaultOptions = [
+        'lifetime' => 120
+    ];
 
     private $translate = null;
     private $admin_translate = null;
@@ -48,18 +51,19 @@ class Helper extends \Phalcon\Mvc\User\Component
 
     }
 
-    public function widget($params)
+    public function widget($namespace = 'Index', array $params = [])
     {
-        return new \Application\Widget\Proxy($params);
+        return new \Application\Widget\Proxy($namespace, $params);
     }
 
     /**
      * Вызов выджета из модуля StaticWidget
      * @param $id - идентификатор виджета, например "phone"
      */
-    public function staticWidget($id)
+    public function staticWidget($id, $params = [])
     {
-        $widget = \Widget\Model\Widget::findFirst(["id='{$id}'", "cache" => ["lifetime" => 120, "key" => HOST_HASH . md5("Widget::findFirst({$id})")]]);
+        $mergeConfig = array_merge(self::StaticWidgetDefaultOptions, $params);
+        $widget = \Widget\Model\Widget::findFirst(["id='{$id}'", "cache" => ["lifetime" => $mergeConfig["lifetime"], "key" => HOST_HASH . md5("Widget::findFirst({$id})")]]);
         if ($widget) {
             return $widget->getHtml();
         }

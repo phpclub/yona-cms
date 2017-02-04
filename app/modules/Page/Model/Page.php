@@ -2,9 +2,10 @@
 
 namespace Page\Model;
 
+use Application\Cache\Keys;
 use Application\Mvc\Model\Model;
-use Phalcon\Mvc\Model\Validator\Uniqueness;
-use Phalcon\Mvc\Model\Validator\PresenceOf;
+use Phalcon\Validation;
+use Phalcon\Validation\Validator\Uniqueness as UniquenessValidator;
 use Application\Localization\Transliterator;
 
 class Page extends Model
@@ -15,17 +16,25 @@ class Page extends Model
         return "page";
     }
 
-    protected $translateModel = 'Page\Model\Translate\PageTranslate'; // translate
+    private $id;
+    private $slug;
+    private $created_at;
+    private $updated_at;
 
-    public $id;
-    public $slug;
-    public $title; // translate
-    public $text; // translate
-    public $meta_title; // translate
-    public $meta_description; // translate
-    public $meta_keywords; // translate
-    public $created_at;
-    public $updated_at;
+    protected $title; // translate
+    protected $text; // translate
+    protected $meta_title; // translate
+    protected $meta_description; // translate
+    protected $meta_keywords; // translate
+
+    protected $translateModel = 'Page\Model\Translate\PageTranslate'; // translate
+    protected $translateFields = [
+        'title',
+        'meta_title',
+        'meta_description',
+        'meta_keywords',
+        'text'
+    ];
 
     public function initialize()
     {
@@ -42,6 +51,15 @@ class Page extends Model
         $this->updated_at = date("Y-m-d H:i:s");
     }
 
+    public function afterUpdate()
+    {
+	$this->getDi()->get('cacheManager')->delete([
+            Keys::PAGE,
+            $this->slug,
+            self::$lang
+        ]);
+    }
+
     public function updateFields($data)
     {
         if (!$this->getSlug()) {
@@ -54,26 +72,27 @@ class Page extends Model
 
     public function validation()
     {
-        $this->validate(new Uniqueness(
-            array(
-                "field" => "slug",
-                "message" => "Page with slug is already exists"
-            )
+        $validator = new Validation();
+        $validator->add('slug', new UniquenessValidator(
+            [
+                "model"   => $this,
+                "message" => $this->getDi()->get('helper')->translate("Page with slug is already exists")
+            ]
         ));
-
-        return $this->validationHasFailed() != true;
+        return $this->validate($validator);
     }
 
     public static function findCachedBySlug($slug)
     {
         $query = "slug = '$slug'";
-        $key = HOST_HASH . md5("Page::findFirst($query)");
-        $page = self::findFirst(array($query, 'cache' => array('key' => $key, 'lifetime' => 60)));
+        $key   = HOST_HASH . md5("Page::findFirst($query)");
+        $page  = self::findFirst([$query, 'cache' => ['key' => $key, 'lifetime' => 60]]);
         return $page;
     }
 
     /**
      * @param mixed $created_at
+     * @return $this
      */
     public function setCreatedAt($created_at)
     {
@@ -91,6 +110,7 @@ class Page extends Model
 
     /**
      * @param mixed $id
+     * @return $this
      */
     public function setId($id)
     {
@@ -108,6 +128,7 @@ class Page extends Model
 
     /**
      * @param mixed $meta_description
+     * @return $this
      */
     public function setMetaDescription($meta_description)
     {
@@ -125,6 +146,7 @@ class Page extends Model
 
     /**
      * @param mixed $meta_keywords
+     * @return $this
      */
     public function setMetaKeywords($meta_keywords)
     {
@@ -142,6 +164,7 @@ class Page extends Model
 
     /**
      * @param mixed $meta_title
+     * @return $this
      */
     public function setMetaTitle($meta_title)
     {
@@ -159,6 +182,7 @@ class Page extends Model
 
     /**
      * @param mixed $slug
+     * @return $this
      */
     public function setSlug($slug)
     {
@@ -176,6 +200,7 @@ class Page extends Model
 
     /**
      * @param mixed $text
+     * @return $this
      */
     public function setText($text)
     {
@@ -193,6 +218,7 @@ class Page extends Model
 
     /**
      * @param mixed $title
+     * @return $this
      */
     public function setTitle($title)
     {
@@ -209,7 +235,8 @@ class Page extends Model
     }
 
     /**
-     * @param mixed $updated_at
+     * @param $updated_at
+     * @return $this
      */
     public function setUpdatedAt($updated_at)
     {
